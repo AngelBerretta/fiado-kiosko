@@ -15,6 +15,7 @@ export default function TestGrabacion() {
   const [nombresExistentes, setNombresExistentes] = useState<string[]>([])
   const [guardando, setGuardando] = useState(false)
   const [mensajeExito, setMensajeExito] = useState('')
+  const [saldoActual, setSaldoActual] = useState<number | null>(null)
 
   const handleAudioListo = async (blob: Blob, extension: string) => {
     setAudioUrl(URL.createObjectURL(blob))
@@ -23,6 +24,7 @@ export default function TestGrabacion() {
     setTexto('')
     setAccion(null)
     setMensajeExito('')
+    setSaldoActual(null)
 
     try {
       const formData = construirFormData(blob, extension)
@@ -47,6 +49,7 @@ export default function TestGrabacion() {
     setAccion(null)
     setError('')
     setMensajeExito('')
+    setSaldoActual(null)
     try {
       const res = await fetch('/api/interpretar', {
         method: 'POST',
@@ -57,6 +60,12 @@ export default function TestGrabacion() {
       if (res.ok) {
         setAccion(data.accion)
         setNombresExistentes(data.nombresExistentes ?? [])
+        
+        if (data.accion.intencion === 'PAGAR_DEUDA' && data.accion.nombre) {
+          const resSaldo = await fetch(`/api/saldo?nombre=${encodeURIComponent(data.accion.nombre)}`)
+          const dataSaldo = await resSaldo.json()
+          setSaldoActual(dataSaldo.existe ? dataSaldo.saldo : 0)
+        }
       } else {
         setError(data.error)
       }
@@ -68,7 +77,7 @@ export default function TestGrabacion() {
     }
   }
 
-  const guardarMovimiento = async (accionFinal: any) => {
+  const guardarMovimiento = async (accionFinal: any, confirmarSobrepago: boolean) => {
     setGuardando(true)
     setMensajeExito('')
     setError('')
@@ -81,6 +90,7 @@ export default function TestGrabacion() {
           intencion: accionFinal.intencion,
           monto: accionFinal.monto,
           detalle: accionFinal.detalle,
+          confirmarSobrepago,
         }),
       })
       const data = await res.json()
@@ -92,6 +102,7 @@ export default function TestGrabacion() {
         setAccion(null)
         setTexto('')
         setAudioUrl(null)
+        setSaldoActual(null)
       }
     } catch (err) {
       console.error(err)
@@ -135,8 +146,9 @@ export default function TestGrabacion() {
         <ConfirmacionMovimiento
           accion={accion}
           nombresExistentes={nombresExistentes}
+          saldoActual={saldoActual}
           onConfirmar={guardarMovimiento}
-          onCancelar={() => setAccion(null)}
+          onCancelar={() => { setAccion(null); setSaldoActual(null) }}
         />
       )}
 

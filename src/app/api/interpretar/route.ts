@@ -41,7 +41,7 @@ Si el nombre mencionado en el texto se parece a alguno de la lista (variación d
           { role: 'user', content: texto },
         ],
         response_format: { type: 'json_object' },
-        temperature: 0.1,
+        temperature: 0,
       }),
     })
 

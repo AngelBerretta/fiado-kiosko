@@ -1,4 +1,5 @@
 import { DeudorConSaldo } from '@/lib/saldos'
+import BotonWhatsapp from './BotonWhatsapp'
 
 interface Props {
   deudores: DeudorConSaldo[]
@@ -32,6 +33,7 @@ export default function ListaDeudores({ deudores, orden = 'saldo' }: Props) {
               ? ''
               : `hace ${diasSinPagar(d.ultimoMovimiento)} día(s)`}
           </span>
+          {d.telefono && <BotonWhatsapp telefono={d.telefono} nombre={d.nombre} saldo={d.saldo} />}
         </li>
       ))}
     </ul>

@@ -12,7 +12,8 @@ interface Accion {
 interface Props {
   accion: Accion
   nombresExistentes: string[]
-  onConfirmar: (accionCorregida: Accion) => void
+  saldoActual: number | null // null = no aplica / todavía no se cargó
+  onConfirmar: (accionCorregida: Accion, confirmarSobrepago: boolean) => void
   onCancelar: () => void
 }
 
@@ -26,14 +27,32 @@ const ETIQUETAS_INTENCION: Record<Accion['intencion'], string> = {
 export default function ConfirmacionMovimiento({
   accion,
   nombresExistentes,
+  saldoActual,
   onConfirmar,
   onCancelar,
 }: Props) {
   const [editado, setEditado] = useState<Accion>(accion)
+  const [pidiendoConfirmacionSobrepago, setPidiendoConfirmacionSobrepago] = useState(false)
 
-  useEffect(() => setEditado(accion), [accion])
+  useEffect(() => {
+    setEditado(accion)
+    setPidiendoConfirmacionSobrepago(false)
+  }, [accion])
 
   const esNombreNuevo = editado.nombre && !nombresExistentes.includes(editado.nombre)
+
+  const esSobrepago =
+    editado.intencion === 'PAGAR_DEUDA' &&
+    saldoActual !== null &&
+    (editado.monto ?? 0) > saldoActual
+
+  const handleConfirmarClick = () => {
+    if (esSobrepago && !pidiendoConfirmacionSobrepago) {
+      setPidiendoConfirmacionSobrepago(true)
+      return
+    }
+    onConfirmar(editado, esSobrepago)
+  }
 
   return (
     <div style={{ border: '1px solid #ccc', padding: 16, marginTop: 16, borderRadius: 8 }}>
@@ -85,8 +104,28 @@ export default function ConfirmacionMovimiento({
         </>
       )}
 
+      {editado.intencion === 'PAGAR_DEUDA' && saldoActual !== null && (
+        <p style={{ fontSize: 13, color: '#555' }}>Saldo actual: ${saldoActual.toLocaleString('es-AR')}</p>
+      )}
+
+      {esSobrepago && (
+        <div style={{ fontSize: 13, color: '#b91c1c', background: '#fef2f2', padding: 10, borderRadius: 4, lineHeight: 1.5 }}>
+          <strong>⚠️ {editado.nombre} debe ${saldoActual?.toLocaleString('es-AR')}, pero el pago es de ${(editado.monto ?? 0).toLocaleString('es-AR')}.</strong>
+          <br />
+          {pidiendoConfirmacionSobrepago ? (
+            <>Si confirmás, se va a registrar un pago de <strong>${saldoActual?.toLocaleString('es-AR')}</strong> (lo que debía), el saldo va a quedar en <strong>$0</strong>, y los <strong>${((editado.monto ?? 0) - (saldoActual ?? 0)).toLocaleString('es-AR')}</strong> de diferencia no se van a registrar en ningún lado.</>
+          ) : (
+            <>Tocá "Confirmar" de nuevo si esto está bien.</>
+          )}
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-        <button onClick={() => onConfirmar(editado)}>✅ Confirmar</button>
+      <button onClick={handleConfirmarClick}>
+        {pidiendoConfirmacionSobrepago
+          ? `✅ Registrar $${saldoActual?.toLocaleString('es-AR')} y dejar saldo en $0`
+          : '✅ Confirmar'}
+      </button>
         <button onClick={onCancelar}>✖️ Cancelar</button>
       </div>
     </div>

@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
   try {
-    const { nombre, intencion, monto, detalle } = await req.json()
+    const { nombre, intencion, monto, detalle, confirmarSobrepago } = await req.json()
 
     if (!nombre || !intencion) {
       return NextResponse.json({ error: 'Faltan datos obligatorios' }, { status: 400 })
@@ -21,7 +21,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'El monto tiene que ser mayor a cero' }, { status: 400 })
     }
 
-    // 1. Buscar deudor existente (case-insensitive) o crear uno nuevo
     const { data: deudorExistente, error: errorBusqueda } = await supabase
       .from('deudores')
       .select('id, nombre')
@@ -50,12 +49,52 @@ export async function POST(req: NextRequest) {
       deudorId = nuevoDeudor.id
     }
 
-    // 2. Guardar el movimiento
+    let montoFinal = monto
+    let detalleFinal = detalle
+
+    // Validación de sobrepago — solo aplica a PAGO
+    if (intencion === 'PAGAR_DEUDA') {
+      const { data: movimientos, error: errorMovs } = await supabase
+        .from('movimientos')
+        .select('tipo, monto')
+        .eq('deudor_id', deudorId)
+
+      if (errorMovs) {
+        console.error('Error trayendo movimientos:', errorMovs)
+        return NextResponse.json({ error: 'Error calculando saldo' }, { status: 500 })
+      }
+
+      const saldoActual = (movimientos ?? []).reduce((acc, m) => {
+        return m.tipo === 'DEUDA' ? acc + Number(m.monto) : acc - Number(m.monto)
+      }, 0)
+
+      if (monto > saldoActual) {
+        if (!confirmarSobrepago) {
+            return NextResponse.json(
+            {
+                error: `El pago de $${monto} supera la deuda de $${saldoActual}. Si confirmás, se va a registrar solo $${saldoActual} y el saldo quedará en $0.`,
+                saldoActual,
+            },
+            { status: 409 }
+            )
+        }
+        // Ajuste automático: se guarda solo lo necesario para dejar el saldo en $0
+        montoFinal = saldoActual
+        detalleFinal = detalle
+          ? `${detalle} (ajustado de $${monto} a $${saldoActual}, saldo llevado a $0)`
+          : `Pago ajustado de $${monto} a $${saldoActual} (saldo llevado a $0)`
+      }
+
+      if (montoFinal <= 0) {
+        return NextResponse.json({ error: 'Este deudor ya no tiene saldo pendiente' }, { status: 400 })
+      }
+    }
+
     const tipo = intencion === 'AGREGAR_DEUDA' ? 'DEUDA' : 'PAGO'
 
     const { data: movimiento, error: errorMovimiento } = await supabase
       .from('movimientos')
-      .insert({ deudor_id: deudorId, tipo, monto, detalle })
+      .insert({ deudor_id: deudorId, tipo, monto: montoFinal, detalle: detalleFinal })
       .select()
       .single()
 
