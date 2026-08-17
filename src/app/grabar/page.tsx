@@ -9,12 +9,15 @@ export default function TestGrabacion() {
   const [texto, setTexto] = useState('')
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState('')
+  const [accion, setAccion] = useState<any>(null)
+  const [interpretando, setInterpretando] = useState(false)
 
   const handleAudioListo = async (blob: Blob, extension: string) => {
     setAudioUrl(URL.createObjectURL(blob))
     setError('')
     setCargando(true)
     setTexto('')
+    setAccion(null)
 
     try {
       const formData = construirFormData(blob, extension)
@@ -34,9 +37,30 @@ export default function TestGrabacion() {
     }
   }
 
+  const interpretarTexto = async () => {
+    setInterpretando(true)
+    setAccion(null)
+    setError('')
+    try {
+      const res = await fetch('/api/interpretar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto }),
+      })
+      const data = await res.json()
+      if (res.ok) setAccion(data.accion)
+      else setError(data.error)
+    } catch (err) {
+      console.error(err)
+      setError('Error de red al interpretar')
+    } finally {
+      setInterpretando(false)
+    }
+  }
+
   return (
     <main style={{ padding: 24 }}>
-      <h1>Test de grabación + transcripción</h1>
+      <h1>Test de grabación + transcripción + interpretación</h1>
       <GrabadorAudio onAudioListo={handleAudioListo} />
 
       {audioUrl && <audio controls src={audioUrl} style={{ marginTop: 16 }} />}
@@ -54,6 +78,20 @@ export default function TestGrabacion() {
           placeholder="Acá aparece la transcripción, o escribí manualmente si falló"
         />
       </div>
+
+      <button 
+        onClick={interpretarTexto} 
+        disabled={!texto || interpretando}
+        style={{ marginTop: 12, padding: '8px 16px' }}
+      >
+        {interpretando ? 'Interpretando...' : '🧠 Interpretar'}
+      </button>
+
+      {accion && (
+        <pre style={{ background: '#f0f0f0', padding: 12, marginTop: 12, borderRadius: 4 }}>
+          {JSON.stringify(accion, null, 2)}
+        </pre>
+      )}
     </main>
   )
 }
