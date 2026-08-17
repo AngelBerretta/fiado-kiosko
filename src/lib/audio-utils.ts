@@ -15,3 +15,9 @@ export function getSupportedMimeType() {
   }
   return null
 }
+
+export function construirFormData(audioBlob: Blob, extension: string) {
+  const formData = new FormData()
+  formData.append('audio', audioBlob, `grabacion.${extension}`)
+  return formData
+}
