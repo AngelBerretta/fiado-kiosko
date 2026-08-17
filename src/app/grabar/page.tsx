@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import GrabadorAudio from '@/components/GrabadorAudio'
+import ConfirmacionMovimiento from '@/components/ConfirmacionMovimiento'
 import { construirFormData } from '@/lib/audio-utils'
 
 export default function TestGrabacion() {
@@ -11,6 +12,7 @@ export default function TestGrabacion() {
   const [error, setError] = useState('')
   const [accion, setAccion] = useState<any>(null)
   const [interpretando, setInterpretando] = useState(false)
+  const [nombresExistentes, setNombresExistentes] = useState<string[]>([])
 
   const handleAudioListo = async (blob: Blob, extension: string) => {
     setAudioUrl(URL.createObjectURL(blob))
@@ -48,8 +50,12 @@ export default function TestGrabacion() {
         body: JSON.stringify({ texto }),
       })
       const data = await res.json()
-      if (res.ok) setAccion(data.accion)
-      else setError(data.error)
+      if (res.ok) {
+        setAccion(data.accion)
+        setNombresExistentes(data.nombresExistentes ?? [])
+      } else {
+        setError(data.error)
+      }
     } catch (err) {
       console.error(err)
       setError('Error de red al interpretar')
@@ -88,9 +94,15 @@ export default function TestGrabacion() {
       </button>
 
       {accion && (
-        <pre style={{ background: '#f0f0f0', padding: 12, marginTop: 12, borderRadius: 4 }}>
-          {JSON.stringify(accion, null, 2)}
-        </pre>
+        <ConfirmacionMovimiento
+          accion={accion}
+          nombresExistentes={nombresExistentes}
+          onConfirmar={(accionFinal) => {
+            console.log('Confirmado:', accionFinal)
+            // acá va a ir el guardado real en el Día 7
+          }}
+          onCancelar={() => setAccion(null)}
+        />
       )}
     </main>
   )
