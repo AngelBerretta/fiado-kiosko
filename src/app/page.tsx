@@ -3,6 +3,8 @@ import ListaDeudores from '@/components/ListaDeudores'
 import Link from 'next/link'
 import { Mic } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
+
 export default async function Home() {
   const deudores = await obtenerDeudoresConSaldo()
   const conDeuda = deudores.filter((d) => d.saldo > 0)
