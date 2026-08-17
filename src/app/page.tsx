@@ -1,22 +1,16 @@
-import { supabase } from '@/lib/supabase'
+import { obtenerDeudoresConSaldo } from '@/lib/saldos'
+import ListaDeudores from '@/components/ListaDeudores'
 
 export default async function Home() {
-  const { data: deudores, error } = await supabase
-    .from('deudores')
-    .select('*')
-
-  if (error) {
-    return <div>Error: {error.message}</div>
-  }
+  const deudores = await obtenerDeudoresConSaldo()
+  const totalAdeudado = deudores.reduce((acc, d) => acc + d.saldo, 0)
 
   return (
     <main style={{ padding: 24 }}>
-      <h1>Deudores</h1>
-      <ul>
-        {deudores?.map((d) => (
-          <li key={d.id}>{d.nombre} — {d.telefono ?? 'sin teléfono'}</li>
-        ))}
-      </ul>
+      <h1>Fiado — Dashboard</h1>
+      <p>Total adeudado: <strong>${totalAdeudado.toLocaleString('es-AR')}</strong></p>
+      <ListaDeudores deudores={deudores} orden="saldo" />
+      <a href="/grabar" style={{ display: 'block', marginTop: 24 }}>🎙️ Registrar movimiento</a>
     </main>
   )
 }

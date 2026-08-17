@@ -13,6 +13,8 @@ export default function TestGrabacion() {
   const [accion, setAccion] = useState<any>(null)
   const [interpretando, setInterpretando] = useState(false)
   const [nombresExistentes, setNombresExistentes] = useState<string[]>([])
+  const [guardando, setGuardando] = useState(false)
+  const [mensajeExito, setMensajeExito] = useState('')
 
   const handleAudioListo = async (blob: Blob, extension: string) => {
     setAudioUrl(URL.createObjectURL(blob))
@@ -20,6 +22,7 @@ export default function TestGrabacion() {
     setCargando(true)
     setTexto('')
     setAccion(null)
+    setMensajeExito('')
 
     try {
       const formData = construirFormData(blob, extension)
@@ -43,6 +46,7 @@ export default function TestGrabacion() {
     setInterpretando(true)
     setAccion(null)
     setError('')
+    setMensajeExito('')
     try {
       const res = await fetch('/api/interpretar', {
         method: 'POST',
@@ -64,15 +68,49 @@ export default function TestGrabacion() {
     }
   }
 
+  const guardarMovimiento = async (accionFinal: any) => {
+    setGuardando(true)
+    setMensajeExito('')
+    setError('')
+    try {
+      const res = await fetch('/api/movimientos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: accionFinal.nombre,
+          intencion: accionFinal.intencion,
+          monto: accionFinal.monto,
+          detalle: accionFinal.detalle,
+        }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error)
+      } else {
+        setMensajeExito('✅ Movimiento guardado correctamente')
+        setAccion(null)
+        setTexto('')
+        setAudioUrl(null)
+      }
+    } catch (err) {
+      console.error(err)
+      setError('Error de red al guardar')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
   return (
     <main style={{ padding: 24 }}>
-      <h1>Test de grabación + transcripción + interpretación</h1>
+      <h1>Registrar movimiento</h1>
       <GrabadorAudio onAudioListo={handleAudioListo} />
 
       {audioUrl && <audio controls src={audioUrl} style={{ marginTop: 16 }} />}
 
       {cargando && <p>Transcribiendo...</p>}
       {error && <p style={{ color: 'red' }}>{error}</p>}
+      {mensajeExito && <p style={{ color: 'green' }}>{mensajeExito}</p>}
 
       <div style={{ marginTop: 16 }}>
         <label>Texto (editable):</label>
@@ -97,13 +135,14 @@ export default function TestGrabacion() {
         <ConfirmacionMovimiento
           accion={accion}
           nombresExistentes={nombresExistentes}
-          onConfirmar={(accionFinal) => {
-            console.log('Confirmado:', accionFinal)
-            // acá va a ir el guardado real en el Día 7
-          }}
+          onConfirmar={guardarMovimiento}
           onCancelar={() => setAccion(null)}
         />
       )}
+
+      {guardando && <p>Guardando...</p>}
+
+      <a href="/" style={{ display: 'block', marginTop: 24 }}>← Volver al dashboard</a>
     </main>
   )
 }
