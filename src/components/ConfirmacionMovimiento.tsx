@@ -12,25 +12,19 @@ interface Accion {
 interface Props {
   accion: Accion
   nombresExistentes: string[]
-  saldoActual: number | null // null = no aplica / todavía no se cargó
+  saldoActual: number | null
   onConfirmar: (accionCorregida: Accion, confirmarSobrepago: boolean) => void
   onCancelar: () => void
 }
 
 const ETIQUETAS_INTENCION: Record<Accion['intencion'], string> = {
-  AGREGAR_DEUDA: '➕ Agregar deuda',
-  PAGAR_DEUDA: '💰 Registrar pago',
-  CONSULTAR_SALDO: '🔍 Consultar saldo',
-  DESCONOCIDA: '❓ No se entendió',
+  AGREGAR_DEUDA: 'Agregar deuda',
+  PAGAR_DEUDA: 'Registrar pago',
+  CONSULTAR_SALDO: 'Consultar saldo',
+  DESCONOCIDA: 'No se entendió',
 }
 
-export default function ConfirmacionMovimiento({
-  accion,
-  nombresExistentes,
-  saldoActual,
-  onConfirmar,
-  onCancelar,
-}: Props) {
+export default function ConfirmacionMovimiento({ accion, nombresExistentes, saldoActual, onConfirmar, onCancelar }: Props) {
   const [editado, setEditado] = useState<Accion>(accion)
   const [pidiendoConfirmacionSobrepago, setPidiendoConfirmacionSobrepago] = useState(false)
 
@@ -40,11 +34,9 @@ export default function ConfirmacionMovimiento({
   }, [accion])
 
   const esNombreNuevo = editado.nombre && !nombresExistentes.includes(editado.nombre)
-
-  const esSobrepago =
-    editado.intencion === 'PAGAR_DEUDA' &&
-    saldoActual !== null &&
-    (editado.monto ?? 0) > saldoActual
+  const esPago = editado.intencion === 'PAGAR_DEUDA'
+  const colorIntencion = esPago ? 'var(--color-verde)' : 'var(--color-rojo)'
+  const esSobrepago = esPago && saldoActual !== null && (editado.monto ?? 0) > saldoActual
 
   const handleConfirmarClick = () => {
     if (esSobrepago && !pidiendoConfirmacionSobrepago) {
@@ -55,78 +47,56 @@ export default function ConfirmacionMovimiento({
   }
 
   return (
-    <div style={{ border: '1px solid #ccc', padding: 16, marginTop: 16, borderRadius: 8 }}>
-      <h3>{ETIQUETAS_INTENCION[editado.intencion]}</h3>
+    <div className="card borde-ticket-arriba">
+      <span style={{ fontSize: 12, letterSpacing: 0.4, textTransform: 'uppercase', color: colorIntencion, fontWeight: 600, display: 'block', marginBottom: 14 }}>
+        {ETIQUETAS_INTENCION[editado.intencion]}
+      </span>
 
-      <label>Intención:</label>
-      <select
-        value={editado.intencion}
-        onChange={(e) => setEditado({ ...editado, intencion: e.target.value as Accion['intencion'] })}
-        style={{ display: 'block', width: '100%', marginBottom: 8 }}
-      >
-        {Object.entries(ETIQUETAS_INTENCION).map(([valor, etiqueta]) => (
-          <option key={valor} value={valor}>{etiqueta}</option>
-        ))}
-      </select>
-
-      <label>Nombre:</label>
+      <label style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Nombre</label>
       <input
         value={editado.nombre ?? ''}
         onChange={(e) => setEditado({ ...editado, nombre: e.target.value })}
-        style={{ display: 'block', width: '100%', marginBottom: 4 }}
         list="nombres-existentes"
+        style={{ display: 'block', width: '100%', border: '1px solid var(--color-border)', borderRadius: 8, padding: 8, marginBottom: 4, fontSize: 15 }}
       />
       <datalist id="nombres-existentes">
         {nombresExistentes.map((n) => <option key={n} value={n} />)}
       </datalist>
-      {esNombreNuevo && (
-        <p style={{ fontSize: 12, color: '#b45309', margin: '4px 0' }}>
-          ⚠️ Este deudor no existe todavía, se va a crear uno nuevo.
-        </p>
-      )}
+      {esNombreNuevo && <p style={{ fontSize: 12, color: 'var(--color-rojo)', margin: '4px 0 12px' }}>Deudor nuevo, se va a crear.</p>}
 
       {editado.intencion !== 'CONSULTAR_SALDO' && (
         <>
-          <label>Monto:</label>
+          <label style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Monto</label>
           <input
             type="number"
+            className="monto"
             value={editado.monto ?? ''}
             onChange={(e) => setEditado({ ...editado, monto: e.target.value ? Number(e.target.value) : null })}
-            style={{ display: 'block', width: '100%', marginBottom: 8 }}
-          />
-
-          <label>Detalle:</label>
-          <input
-            value={editado.detalle ?? ''}
-            onChange={(e) => setEditado({ ...editado, detalle: e.target.value })}
-            style={{ display: 'block', width: '100%', marginBottom: 8 }}
+            style={{ display: 'block', width: '100%', border: '1px solid var(--color-border)', borderRadius: 8, padding: 8, marginBottom: 12, fontSize: 16 }}
           />
         </>
       )}
 
-      {editado.intencion === 'PAGAR_DEUDA' && saldoActual !== null && (
-        <p style={{ fontSize: 13, color: '#555' }}>Saldo actual: ${saldoActual.toLocaleString('es-AR')}</p>
+      {esPago && saldoActual !== null && (
+        <p style={{ fontSize: 13, color: 'var(--color-ink-muted)', margin: '0 0 8px' }}>
+          Saldo actual: <span className="monto">${saldoActual.toLocaleString('es-AR')}</span>
+        </p>
       )}
 
       {esSobrepago && (
-        <div style={{ fontSize: 13, color: '#b91c1c', background: '#fef2f2', padding: 10, borderRadius: 4, lineHeight: 1.5 }}>
-          <strong>⚠️ {editado.nombre} debe ${saldoActual?.toLocaleString('es-AR')}, pero el pago es de ${(editado.monto ?? 0).toLocaleString('es-AR')}.</strong>
-          <br />
-          {pidiendoConfirmacionSobrepago ? (
-            <>Si confirmás, se va a registrar un pago de <strong>${saldoActual?.toLocaleString('es-AR')}</strong> (lo que debía), el saldo va a quedar en <strong>$0</strong>, y los <strong>${((editado.monto ?? 0) - (saldoActual ?? 0)).toLocaleString('es-AR')}</strong> de diferencia no se van a registrar en ningún lado.</>
-          ) : (
-            <>Tocá "Confirmar" de nuevo si esto está bien.</>
-          )}
+        <div style={{ fontSize: 13, color: 'var(--color-rojo)', background: 'var(--color-rojo-soft)', padding: 10, borderRadius: 8, marginBottom: 12, lineHeight: 1.5 }}>
+          <strong>{editado.nombre} debe ${saldoActual?.toLocaleString('es-AR')}</strong>, el pago es de ${(editado.monto ?? 0).toLocaleString('es-AR')}.
+          {pidiendoConfirmacionSobrepago
+            ? ` Se va a registrar $${saldoActual?.toLocaleString('es-AR')}, el saldo queda en $0.`
+            : ' Confirmá de nuevo si está bien.'}
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-      <button onClick={handleConfirmarClick}>
-        {pidiendoConfirmacionSobrepago
-          ? `✅ Registrar $${saldoActual?.toLocaleString('es-AR')} y dejar saldo en $0`
-          : '✅ Confirmar'}
-      </button>
-        <button onClick={onCancelar}>✖️ Cancelar</button>
+      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        <button onClick={handleConfirmarClick} className="btn-primario" style={{ flex: 1 }}>
+          {pidiendoConfirmacionSobrepago ? 'Sí, dejar saldo en $0' : 'Confirmar'}
+        </button>
+        <button onClick={onCancelar} className="btn-secundario">Cancelar</button>
       </div>
     </div>
   )
