@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { resolverKioscoId } from '@/lib/kiosco-server'
 
 export async function POST(req: NextRequest) {
   try {
-    const { nombre, intencion, monto, detalle, confirmarSobrepago } = await req.json()
+    const { nombre, intencion, monto, detalle, confirmarSobrepago, slug } = await req.json()
 
     if (!nombre || !intencion) {
       return NextResponse.json({ error: 'Faltan datos obligatorios' }, { status: 400 })
+    }
+
+    if (!slug) {
+      return NextResponse.json({ error: 'Falta el kiosco' }, { status: 400 })
+    }
+
+    const kioscoId = await resolverKioscoId(slug)
+    if (!kioscoId) {
+      return NextResponse.json({ error: 'Kiosco no encontrado' }, { status: 404 })
     }
 
     if (intencion === 'CONSULTAR_SALDO') {
@@ -24,6 +34,7 @@ export async function POST(req: NextRequest) {
     const { data: deudorExistente, error: errorBusqueda } = await supabase
       .from('deudores')
       .select('id, nombre')
+      .eq('kiosco_id', kioscoId)
       .ilike('nombre', nombre)
       .maybeSingle()
 
@@ -37,7 +48,7 @@ export async function POST(req: NextRequest) {
     if (!deudorId) {
       const { data: nuevoDeudor, error: errorCreacion } = await supabase
         .from('deudores')
-        .insert({ nombre })
+        .insert({ nombre, kiosco_id: kioscoId })
         .select('id')
         .single()
 
@@ -52,7 +63,6 @@ export async function POST(req: NextRequest) {
     let montoFinal = monto
     let detalleFinal = detalle
 
-    // Validación de sobrepago — solo aplica a PAGO
     if (intencion === 'PAGAR_DEUDA') {
       const { data: movimientos, error: errorMovs } = await supabase
         .from('movimientos')
@@ -70,15 +80,14 @@ export async function POST(req: NextRequest) {
 
       if (monto > saldoActual) {
         if (!confirmarSobrepago) {
-            return NextResponse.json(
+          return NextResponse.json(
             {
-                error: `El pago de $${monto} supera la deuda de $${saldoActual}. Si confirmás, se va a registrar solo $${saldoActual} y el saldo quedará en $0.`,
-                saldoActual,
+              error: `El pago de $${monto} supera la deuda de $${saldoActual}. Si confirmás, se va a registrar solo $${saldoActual} y el saldo quedará en $0.`,
+              saldoActual,
             },
             { status: 409 }
-            )
+          )
         }
-        // Ajuste automático: se guarda solo lo necesario para dejar el saldo en $0
         montoFinal = saldoActual
         detalleFinal = detalle
           ? `${detalle} (ajustado de $${monto} a $${saldoActual}, saldo llevado a $0)`

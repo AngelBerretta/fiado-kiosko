@@ -5,22 +5,28 @@ export interface DeudorConSaldo {
   nombre: string
   telefono: string | null
   saldo: number
-  ultimoMovimiento: string | null // fecha ISO
+  ultimoMovimiento: string | null
 }
 
-export async function obtenerDeudoresConSaldo(): Promise<DeudorConSaldo[]> {
-  const { data: deudores, error: errorDeudores } = await supabase
-    .from('deudores')
-    .select('id, nombre, telefono')
+export async function obtenerDeudoresConSaldo(kioscoId?: string | null): Promise<DeudorConSaldo[]> {
+  let query = supabase.from('deudores').select('id, nombre, telefono')
+  if (kioscoId) query = query.eq('kiosco_id', kioscoId)
+
+  const { data: deudores, error: errorDeudores } = await query
 
   if (errorDeudores || !deudores) {
     console.error('Error trayendo deudores:', errorDeudores)
     return []
   }
 
+  if (deudores.length === 0) return []
+
+  const idsDeudores = deudores.map((d) => d.id)
+
   const { data: movimientos, error: errorMovimientos } = await supabase
     .from('movimientos')
     .select('deudor_id, tipo, monto, created_at')
+    .in('deudor_id', idsDeudores)
 
   if (errorMovimientos) {
     console.error('Error trayendo movimientos:', errorMovimientos)

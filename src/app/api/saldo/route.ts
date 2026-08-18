@@ -1,16 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { resolverKioscoId } from '@/lib/kiosco-server'
 
 export async function GET(req: NextRequest) {
   const nombre = req.nextUrl.searchParams.get('nombre')
+  const slug = req.nextUrl.searchParams.get('slug')
 
   if (!nombre) {
     return NextResponse.json({ error: 'Falta el nombre' }, { status: 400 })
+  }
+  if (!slug) {
+    return NextResponse.json({ error: 'Falta el kiosco' }, { status: 400 })
+  }
+
+  const kioscoId = await resolverKioscoId(slug)
+  if (!kioscoId) {
+    return NextResponse.json({ error: 'Kiosco no encontrado' }, { status: 404 })
   }
 
   const { data: deudor, error: errorDeudor } = await supabase
     .from('deudores')
     .select('id')
+    .eq('kiosco_id', kioscoId)
     .ilike('nombre', nombre)
     .maybeSingle()
 

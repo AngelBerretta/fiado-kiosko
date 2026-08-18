@@ -1,19 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { PROMPT_INTERPRETACION } from '@/lib/prompts'
+import { resolverKioscoId } from '@/lib/kiosco-server'
 
 export async function POST(req: NextRequest) {
   try {
-    const { texto } = await req.json()
+    const { texto, slug } = await req.json()
 
     if (!texto || typeof texto !== 'string') {
       return NextResponse.json({ error: 'Falta el texto a interpretar' }, { status: 400 })
     }
+    if (!slug) {
+      return NextResponse.json({ error: 'Falta el kiosco' }, { status: 400 })
+    }
 
-    // 1. Traer nombres existentes para que la IA pueda matchear variaciones
+    const kioscoId = await resolverKioscoId(slug)
+    if (!kioscoId) {
+      return NextResponse.json({ error: 'Kiosco no encontrado' }, { status: 404 })
+    }
+
     const { data: deudores, error: errorDeudores } = await supabase
       .from('deudores')
       .select('nombre')
+      .eq('kiosco_id', kioscoId)
 
     if (errorDeudores) {
       console.error('Error trayendo deudores:', errorDeudores)
@@ -21,7 +30,6 @@ export async function POST(req: NextRequest) {
 
     const nombresExistentes = deudores?.map((d) => d.nombre) ?? []
 
-    // 2. Armar el prompt con la lista inyectada
     const promptConContexto = `${PROMPT_INTERPRETACION}
 
 Lista de deudores ya registrados: ${nombresExistentes.length > 0 ? nombresExistentes.join(', ') : '(ninguno todavía)'}

@@ -6,8 +6,10 @@ import { ArrowLeft, Check } from 'lucide-react'
 import GrabadorAudio from '@/components/GrabadorAudio'
 import ConfirmacionMovimiento from '@/components/ConfirmacionMovimiento'
 import { construirFormData } from '@/lib/audio-utils'
+import { useKioscoSlug } from '@/lib/useKiosco'
 
 export default function Grabar() {
+  const { slug, cargando: cargandoSlug } = useKioscoSlug()
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [texto, setTexto] = useState('')
   const [cargando, setCargando] = useState(false)
@@ -36,17 +38,18 @@ export default function Grabar() {
   }
 
   const interpretarTexto = async () => {
+    if (!slug) return
     setInterpretando(true); setAccion(null); setError('')
     try {
       const res = await fetch('/api/interpretar', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto, slug }),
       })
       const data = await res.json()
       if (res.ok) {
         setAccion(data.accion)
         setNombresExistentes(data.nombresExistentes ?? [])
         if (data.accion.intencion === 'PAGAR_DEUDA' && data.accion.nombre) {
-          const resSaldo = await fetch(`/api/saldo?nombre=${encodeURIComponent(data.accion.nombre)}`)
+          const resSaldo = await fetch(`/api/saldo?nombre=${encodeURIComponent(data.accion.nombre)}&slug=${encodeURIComponent(slug)}`)
           const dataSaldo = await resSaldo.json()
           setSaldoActual(dataSaldo.existe ? dataSaldo.saldo : 0)
         } else {
@@ -64,12 +67,13 @@ export default function Grabar() {
   }
 
   const guardarMovimiento = async (accionFinal: any, confirmarSobrepago: boolean) => {
+    if (!slug) return
     try {
       const res = await fetch('/api/movimientos', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nombre: accionFinal.nombre, intencion: accionFinal.intencion,
-          monto: accionFinal.monto, detalle: accionFinal.detalle, confirmarSobrepago,
+          monto: accionFinal.monto, detalle: accionFinal.detalle, confirmarSobrepago, slug,
         }),
       })
       const data = await res.json()
@@ -83,6 +87,14 @@ export default function Grabar() {
       console.error(err)
       setError('Error de red al guardar')
     }
+  }
+
+  if (cargandoSlug || !slug) {
+    return (
+      <main style={{ maxWidth: 480, margin: '0 auto', padding: 24 }}>
+        <p style={{ color: 'var(--color-ink-muted)' }}>Cargando…</p>
+      </main>
+    )
   }
 
   return (
