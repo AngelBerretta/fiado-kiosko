@@ -1,0 +1,31 @@
+{
+  "name": "Fiado - Cuenta corriente del kiosco",
+  "short_name": "Fiado",
+  "description": "Gestioná el fiado de tu kiosco por voz, sin planillas.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4F5F7",
+  "theme_color": "#1F3A93",
+  "lang": "es-AR",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Registrar por voz",
+      "short_name": "Registrar",
+      "url": "/grabar",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Ver reportes",
+      "short_name": "Reportes",
+      "url": "/reportes",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
