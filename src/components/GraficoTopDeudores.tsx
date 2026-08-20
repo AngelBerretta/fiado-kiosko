@@ -1,10 +1,12 @@
 'use client'
 
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 
 interface Props {
   datos: { nombre: string; saldo: number }[]
 }
+
+const COLORES = ['#B3401F', '#C2521F', '#D06B2A', '#DE8639', '#E8A34E']
 
 export default function GraficoTopDeudores({ datos }: Props) {
   if (datos.length === 0) {
@@ -16,15 +18,10 @@ export default function GraficoTopDeudores({ datos }: Props) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={260}>
+    <ResponsiveContainer width="100%" height={240}>
       <BarChart data={datos} layout="vertical" margin={{ top: 4, right: 16, left: 4, bottom: 4 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
-        <XAxis
-          type="number"
-          tickFormatter={(v: number) => `$${v.toLocaleString('es-AR')}`}
-          fontSize={11}
-          stroke="var(--color-ink-muted)"
-        />
+        <XAxis type="number" tickFormatter={(v: number) => `$${v.toLocaleString('es-AR')}`} fontSize={11} stroke="var(--color-ink-muted)" />
         <YAxis type="category" dataKey="nombre" width={90} fontSize={12} stroke="var(--color-ink-muted)" />
         <Tooltip
           formatter={(value) => {
@@ -33,7 +30,9 @@ export default function GraficoTopDeudores({ datos }: Props) {
           }}
           contentStyle={{ borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 13 }}
         />
-        <Bar dataKey="saldo" fill="#B3401F" radius={[0, 6, 6, 0]} />
+        <Bar dataKey="saldo" radius={[0, 6, 6, 0]}>
+          {datos.map((_, i) => <Cell key={i} fill={COLORES[i % COLORES.length]} />)}
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   )

@@ -3,7 +3,7 @@
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 
 interface Props {
-  datos: { semana: string; totalDeuda: number }[]
+  datos: { etiqueta: string; totalDeuda: number }[]
 }
 
 export default function GraficoDeudaTotal({ datos }: Props) {
@@ -16,7 +16,7 @@ export default function GraficoDeudaTotal({ datos }: Props) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ResponsiveContainer width="100%" height={200}>
       <AreaChart data={datos} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
         <defs>
           <linearGradient id="colorDeuda" x1="0" y1="0" x2="0" y2="1">
@@ -25,12 +25,8 @@ export default function GraficoDeudaTotal({ datos }: Props) {
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-        <XAxis dataKey="semana" fontSize={11} stroke="var(--color-ink-muted)" />
-        <YAxis
-          fontSize={11}
-          stroke="var(--color-ink-muted)"
-          tickFormatter={(v: number) => `$${v.toLocaleString('es-AR')}`}
-        />
+        <XAxis dataKey="etiqueta" fontSize={11} stroke="var(--color-ink-muted)" />
+        <YAxis fontSize={11} stroke="var(--color-ink-muted)" tickFormatter={(v: number) => `$${v.toLocaleString('es-AR')}`} />
         <Tooltip
           formatter={(value) => {
             const numero = typeof value === 'number' ? value : Number(value ?? 0)

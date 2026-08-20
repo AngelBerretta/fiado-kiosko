@@ -1,28 +1,29 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Check } from 'lucide-react'
-import GrabadorAudio from '@/components/GrabadorAudio'
+import { useRouter } from 'next/navigation'
+import { Check } from 'lucide-react'
+import PantallaEscuchando from '@/components/PantallaEscuchando'
 import ConfirmacionMovimiento from '@/components/ConfirmacionMovimiento'
+import NumerosResaltados from '@/components/NumerosResaltados'
 import { construirFormData } from '@/lib/audio-utils'
+import { useGrabacionAudio } from '@/lib/useGrabacionAudio'
 import { useKioscoSlug } from '@/lib/useKiosco'
 
 export default function Grabar() {
+  const router = useRouter()
   const { slug, cargando: cargandoSlug } = useKioscoSlug()
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [texto, setTexto] = useState('')
-  const [cargando, setCargando] = useState(false)
+  const [transcribiendo, setTranscribiendo] = useState(false)
   const [error, setError] = useState('')
   const [accion, setAccion] = useState<any>(null)
   const [nombresExistentes, setNombresExistentes] = useState<string[]>([])
-  const [saldoActual, setSaldoActual] = useState<number | null>(null)
   const [interpretando, setInterpretando] = useState(false)
   const [mensajeExito, setMensajeExito] = useState('')
 
   const handleAudioListo = async (blob: Blob, extension: string) => {
-    setAudioUrl(URL.createObjectURL(blob))
-    setError(''); setCargando(true); setTexto(''); setAccion(null); setMensajeExito('')
+    setError(''); setTranscribiendo(true); setTexto(''); setAccion(null); setMensajeExito('')
     try {
       const formData = construirFormData(blob, extension)
       const res = await fetch('/api/transcribir', { method: 'POST', body: formData })
@@ -33,8 +34,19 @@ export default function Grabar() {
       console.error(err)
       setError('Error de red. Podés escribir el texto manualmente.')
     } finally {
-      setCargando(false)
+      setTranscribiendo(false)
     }
+  }
+
+  const { estado: estadoGrabacion, errorMsg: errorMic, segundos, detener, cancelar, reintentar } = useGrabacionAudio(handleAudioListo)
+
+  useEffect(() => {
+    if (estadoGrabacion === 'cancelada') router.replace('/')
+  }, [estadoGrabacion, router])
+
+  const grabarDeNuevo = () => {
+    setTexto(''); setAccion(null); setError(''); setMensajeExito('')
+    reintentar()
   }
 
   const interpretarTexto = async () => {
@@ -48,13 +60,6 @@ export default function Grabar() {
       if (res.ok) {
         setAccion(data.accion)
         setNombresExistentes(data.nombresExistentes ?? [])
-        if (data.accion.intencion === 'PAGAR_DEUDA' && data.accion.nombre) {
-          const resSaldo = await fetch(`/api/saldo?nombre=${encodeURIComponent(data.accion.nombre)}&slug=${encodeURIComponent(slug)}`)
-          const dataSaldo = await resSaldo.json()
-          setSaldoActual(dataSaldo.existe ? dataSaldo.saldo : 0)
-        } else {
-          setSaldoActual(null)
-        }
       } else {
         setError(data.error)
       }
@@ -81,7 +86,7 @@ export default function Grabar() {
         setError(data.error)
       } else {
         setMensajeExito('Movimiento guardado')
-        setAccion(null); setTexto(''); setSaldoActual(null); setAudioUrl(null)
+        setAccion(null); setTexto('')
       }
     } catch (err) {
       console.error(err)
@@ -91,54 +96,84 @@ export default function Grabar() {
 
   if (cargandoSlug || !slug) {
     return (
-      <main style={{ maxWidth: 480, margin: '0 auto', padding: 24 }}>
+      <main className="pagina-angosta">
         <p style={{ color: 'var(--color-ink-muted)' }}>Cargando…</p>
       </main>
     )
   }
 
-  return (
-    <main style={{ maxWidth: 480, margin: '0 auto', padding: '24px 20px 60px' }}>
-      <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--color-ink-muted)', textDecoration: 'none' }}>
-        <ArrowLeft size={14} /> Volver
-      </Link>
-      <h1 style={{ fontSize: 20, fontWeight: 600, margin: '12px 0 24px' }}>Registrar movimiento</h1>
+  if (estadoGrabacion === 'iniciando' || estadoGrabacion === 'grabando') {
+    return <PantallaEscuchando segundos={segundos} onTerminar={detener} onCancelar={cancelar} />
+  }
 
-      <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 0' }}>
-        <GrabadorAudio onAudioListo={handleAudioListo} />
-      </div>
-
-      {audioUrl && <audio controls src={audioUrl} style={{ width: '100%', marginBottom: 16 }} />}
-      {cargando && <p style={{ fontSize: 14, color: 'var(--color-ink-muted)' }}>Transcribiendo…</p>}
-      {error && <div className="chip chip-rojo" style={{ display: 'block', marginBottom: 12 }}>{error}</div>}
-
-      {(texto || audioUrl) && !cargando && (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 12, color: 'var(--color-ink-muted)', display: 'block', marginBottom: 6 }}>Texto (editable)</label>
-          <textarea
-            value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            rows={3}
-            style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: 8, padding: 10, fontFamily: 'var(--font-sans)', fontSize: 14, resize: 'vertical' }}
-            placeholder="Acá aparece la transcripción, o escribí manualmente"
-          />
-          <button onClick={interpretarTexto} disabled={!texto || interpretando} className="btn-primario" style={{ marginTop: 12, width: '100%' }}>
-            {interpretando ? 'Interpretando…' : 'Interpretar'}
-          </button>
+  if (estadoGrabacion === 'error') {
+    return (
+      <main className="pagina-angosta">
+        <h1 style={{ fontSize: 20, fontWeight: 600, margin: '0 0 16px' }}>Registrar movimiento</h1>
+        <div className="chip chip-rojo" role="alert" style={{ display: 'block', marginBottom: 16 }}>{errorMic}</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={reintentar} className="btn-primario" style={{ flex: 1 }}>Reintentar</button>
+          <button onClick={() => router.replace('/')} className="btn-secundario">Volver</button>
         </div>
+      </main>
+    )
+  }
+
+  return (
+    <main className="pagina-angosta">
+      <h1 style={{ fontSize: 20, fontWeight: 600, margin: '0 0 24px' }}>Registrar movimiento</h1>
+
+      {transcribiendo && <p role="status" style={{ fontSize: 14, color: 'var(--color-ink-muted)' }}>Transcribiendo…</p>}
+      {error && <div className="chip chip-rojo" role="alert" style={{ display: 'block', marginBottom: 12 }}>{error}</div>}
+
+      {texto && !transcribiendo && !accion && (
+        <>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <NumerosResaltados texto={texto} />
+
+            <label htmlFor="texto-transcripcion" style={{ fontSize: 12, color: 'var(--color-ink-muted)', display: 'block', marginBottom: 6 }}>
+              Texto (editable)
+            </label>
+            <textarea
+              id="texto-transcripcion"
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              rows={3}
+              style={{ width: '100%', border: '1px solid var(--color-border)', borderRadius: 8, padding: 10, fontFamily: 'var(--font-sans)', fontSize: 16, resize: 'vertical' }}
+              placeholder="Acá aparece la transcripción, o escribí manualmente"
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+              <button onClick={interpretarTexto} disabled={!texto || interpretando} className="btn-primario" style={{ flex: 1 }}>
+                {interpretando ? 'Interpretando…' : 'Interpretar'}
+              </button>
+              <button onClick={grabarDeNuevo} className="btn-secundario" style={{ whiteSpace: 'nowrap', fontSize: 13, padding: '10px 14px' }}>
+                Grabar de nuevo
+              </button>
+            </div>
+          </div>
+          <Link href="/" className="link-cancelar-flujo">Cancelar y volver a inicio</Link>
+        </>
       )}
 
-      {accion && (
+      {accion && slug && (
         <ConfirmacionMovimiento
-          accion={accion} nombresExistentes={nombresExistentes} saldoActual={saldoActual}
+          accion={accion} nombresExistentes={nombresExistentes} slug={slug}
           onConfirmar={guardarMovimiento}
-          onCancelar={() => { setAccion(null); setSaldoActual(null) }}
+          onCancelar={() => setAccion(null)}
         />
       )}
 
       {mensajeExito && (
-        <div className="chip chip-verde" style={{ display: 'inline-flex', marginTop: 16 }}>
-          <Check size={14} /> {mensajeExito}
+        <div className="card" style={{ textAlign: 'center', padding: '32px 20px' }}>
+          <div className="exito-check"><Check size={22} /></div>
+          <p style={{ fontSize: 15, fontWeight: 600, margin: '12px 0 4px' }}>{mensajeExito}</p>
+          <p style={{ fontSize: 13, color: 'var(--color-ink-muted)', margin: '0 0 20px' }}>¿Qué querés hacer ahora?</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button onClick={grabarDeNuevo} className="btn-primario">Registrar otro</button>
+            <Link href="/" className="btn-secundario" style={{ textDecoration: 'none', textAlign: 'center', display: 'block' }}>
+              Volver a inicio
+            </Link>
+          </div>
         </div>
       )}
     </main>

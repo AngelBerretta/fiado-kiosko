@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 
 export interface PuntoTendencia {
-  semana: string
+  etiqueta: string
   totalDeuda: number
 }
 
@@ -9,7 +9,9 @@ export interface DatosReportes {
   totalAdeudado: number
   cantidadDeudoresActivos: number
   topDeudores: { nombre: string; saldo: number }[]
+  todosLosDeudores: { nombre: string; saldo: number }[]
   tendenciaSemanal: PuntoTendencia[]
+  tendenciaDiaria: PuntoTendencia[]
 }
 
 function inicioDeSemana(fecha: Date): Date {
@@ -25,6 +27,11 @@ function etiquetaSemana(fecha: Date): string {
   return fecha.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
 }
 
+function etiquetaDia(fecha: Date): string {
+  const texto = fecha.toLocaleDateString('es-AR', { weekday: 'short' }).replace('.', '')
+  return texto.charAt(0).toUpperCase() + texto.slice(1)
+}
+
 export async function obtenerDatosReportes(kioscoId: string | null, semanas = 8): Promise<DatosReportes> {
   let queryDeudores = supabase.from('deudores').select('id, nombre')
   if (kioscoId) queryDeudores = queryDeudores.eq('kiosco_id', kioscoId)
@@ -35,7 +42,7 @@ export async function obtenerDatosReportes(kioscoId: string | null, semanas = 8)
   const idsDeudores = (deudores ?? []).map((d) => d.id)
 
   if (idsDeudores.length === 0) {
-    return { totalAdeudado: 0, cantidadDeudoresActivos: 0, topDeudores: [], tendenciaSemanal: [] }
+    return { totalAdeudado: 0, cantidadDeudoresActivos: 0, topDeudores: [], todosLosDeudores: [], tendenciaSemanal: [], tendenciaDiaria: [] }
   }
 
   const { data: movimientos, error: errorMovs } = await supabase
@@ -59,13 +66,14 @@ export async function obtenerDatosReportes(kioscoId: string | null, semanas = 8)
   const totalAdeudado = saldosPositivos.reduce((acc, [, saldo]) => acc + saldo, 0)
   const cantidadDeudoresActivos = saldosPositivos.length
 
-  const topDeudores = saldosPositivos
+  const todosLosDeudores = saldosPositivos
     .map(([id, saldo]) => ({ nombre: nombrePorId.get(id) ?? '—', saldo }))
     .sort((a, b) => b.saldo - a.saldo)
-    .slice(0, 5)
 
-  // Tendencia semanal: saldo total acumulado hasta el fin de cada semana
+  const topDeudores = todosLosDeudores.slice(0, 5)
+
   const hoy = new Date()
+
   const inicioActual = inicioDeSemana(hoy)
   const semanasArr: Date[] = []
   for (let i = semanas - 1; i >= 0; i--) {
@@ -73,17 +81,28 @@ export async function obtenerDatosReportes(kioscoId: string | null, semanas = 8)
     d.setDate(d.getDate() - i * 7)
     semanasArr.push(d)
   }
-
   const tendenciaSemanal: PuntoTendencia[] = semanasArr.map((inicioSemana) => {
     const finSemana = new Date(inicioSemana)
     finSemana.setDate(finSemana.getDate() + 7)
-
     const totalDeuda = movs
       .filter((m) => new Date(m.created_at) < finSemana)
       .reduce((acc, m) => acc + (m.tipo === 'DEUDA' ? Number(m.monto) : -Number(m.monto)), 0)
-
-    return { semana: etiquetaSemana(inicioSemana), totalDeuda: Math.max(0, totalDeuda) }
+    return { etiqueta: etiquetaSemana(inicioSemana), totalDeuda: Math.max(0, totalDeuda) }
   })
 
-  return { totalAdeudado, cantidadDeudoresActivos, topDeudores, tendenciaSemanal }
+  const diasArr: Date[] = []
+  for (let i = 6; i >= 0; i--) {
+    const finDia = new Date(hoy)
+    finDia.setDate(finDia.getDate() - i)
+    finDia.setHours(23, 59, 59, 999)
+    diasArr.push(finDia)
+  }
+  const tendenciaDiaria: PuntoTendencia[] = diasArr.map((finDia) => {
+    const totalDeuda = movs
+      .filter((m) => new Date(m.created_at) <= finDia)
+      .reduce((acc, m) => acc + (m.tipo === 'DEUDA' ? Number(m.monto) : -Number(m.monto)), 0)
+    return { etiqueta: etiquetaDia(finDia), totalDeuda: Math.max(0, totalDeuda) }
+  })
+
+  return { totalAdeudado, cantidadDeudoresActivos, topDeudores, todosLosDeudores, tendenciaSemanal, tendenciaDiaria }
 }

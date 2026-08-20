@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
 import { useKioscoSlug } from '@/lib/useKiosco'
 import GraficoTopDeudores from '@/components/GraficoTopDeudores'
 import GraficoDeudaTotal from '@/components/GraficoDeudaTotal'
+import ResumenCartera from '@/components/ResumenCartera'
+import ExportarResumenWhatsapp from '@/components/ExportarResumenWhatsapp'
+import AppShell from '@/components/AppShell'
 import { DatosReportes } from '@/lib/reportes'
 
 export default function Reportes() {
@@ -30,38 +31,38 @@ export default function Reportes() {
   }, [slug, cargandoSlug])
 
   return (
-    <main style={{ maxWidth: 480, margin: '0 auto', padding: '24px 20px 60px' }}>
-      <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--color-ink-muted)', textDecoration: 'none' }}>
-        <ArrowLeft size={14} /> Volver
-      </Link>
-      <h1 style={{ fontSize: 20, fontWeight: 600, margin: '12px 0 24px' }}>Reportes</h1>
+    <AppShell>
+      <h1 style={{ fontSize: 20, fontWeight: 600, margin: '0 0 20px' }}>Reportes</h1>
 
       {(cargando || cargandoSlug) && <p style={{ color: 'var(--color-ink-muted)' }}>Cargando…</p>}
       {error && <p style={{ color: 'var(--color-rojo)' }}>{error}</p>}
 
       {datos && (
         <>
-          <div className="card borde-ticket-abajo" style={{ marginBottom: 32 }}>
-            <p style={{ fontSize: 13, color: 'var(--color-ink-muted)', margin: '0 0 4px' }}>Total adeudado</p>
-            <p className="monto" style={{ fontSize: 28, margin: 0, color: datos.totalAdeudado > 0 ? 'var(--color-rojo)' : 'var(--color-verde)' }}>
-              ${datos.totalAdeudado.toLocaleString('es-AR')}
-            </p>
-            <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', margin: '6px 0 0' }}>
-              {datos.cantidadDeudoresActivos} {datos.cantidadDeudoresActivos === 1 ? 'deudor activo' : 'deudores activos'}
-            </p>
+          <ResumenCartera
+            totalAdeudado={datos.totalAdeudado}
+            cantidadDeudores={datos.cantidadDeudoresActivos}
+            etiquetaMonto="Total adeudado"
+            etiquetaCantidad="Deudores activos"
+          />
+
+          <div style={{ marginBottom: 16 }}>
+            <ExportarResumenWhatsapp datos={datos} />
           </div>
 
-          <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 12px' }}>Top deudores</h2>
-          <div className="card" style={{ marginBottom: 32 }}>
-            <GraficoTopDeudores datos={datos.topDeudores} />
-          </div>
+          <div className="reportes__graficos">
+            <section className="card">
+              <h2 className="reportes__titulo-grafico">Evolución de deuda (7 días)</h2>
+              <GraficoDeudaTotal datos={datos.tendenciaDiaria} />
+            </section>
 
-          <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 12px' }}>Tendencia semanal</h2>
-          <div className="card">
-            <GraficoDeudaTotal datos={datos.tendenciaSemanal} />
+            <section className="card">
+              <h2 className="reportes__titulo-grafico">Top 5 deudores</h2>
+              <GraficoTopDeudores datos={datos.topDeudores} />
+            </section>
           </div>
         </>
       )}
-    </main>
+    </AppShell>
   )
 }
