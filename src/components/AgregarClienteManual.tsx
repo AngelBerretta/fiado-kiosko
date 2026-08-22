@@ -2,19 +2,28 @@
 
 import { useState } from 'react'
 
+interface ClienteExistente {
+  id: string
+  nombre: string
+  telefono: string | null
+}
+
 interface Props {
   slug: string
-  onClienteCreado: () => void
+  clienteExistente?: ClienteExistente
+  onClienteCreado: (mensaje: string) => void
   onCancelar: () => void
 }
 
-export default function AgregarClienteManual({ slug, onClienteCreado, onCancelar }: Props) {
-  const [nombre, setNombre] = useState('')
-  const [telefono, setTelefono] = useState('')
+export default function AgregarClienteManual({ slug, clienteExistente, onClienteCreado, onCancelar }: Props) {
+  const [nombre, setNombre] = useState(clienteExistente?.nombre ?? '')
+  const [telefono, setTelefono] = useState(clienteExistente?.telefono ?? '')
   const [monto, setMonto] = useState('')
   const [detalle, setDetalle] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
+
+  const esParaClienteExistente = !!clienteExistente
 
   const guardar = async () => {
     if (!nombre.trim()) {
@@ -24,7 +33,6 @@ export default function AgregarClienteManual({ slug, onClienteCreado, onCancelar
     setError('')
     setGuardando(true)
     try {
-      // 1. Crear el deudor
       const resDeudor = await fetch('/api/deudores', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -37,8 +45,8 @@ export default function AgregarClienteManual({ slug, onClienteCreado, onCancelar
         return
       }
 
-      // 2. Si hay monto, registrar la deuda
       const montoNum = Number(monto)
+      let deudaGuardada = false
       if (monto && montoNum > 0) {
         const resMovimiento = await fetch('/api/movimientos', {
           method: 'POST',
@@ -55,12 +63,18 @@ export default function AgregarClienteManual({ slug, onClienteCreado, onCancelar
         const dataMovimiento = await resMovimiento.json()
 
         if (!resMovimiento.ok) {
-          setError(`Cliente creado pero la deuda no se guardó: ${dataMovimiento.error}`)
+          setError(`Cliente guardado pero la deuda no se pudo registrar: ${dataMovimiento.error}`)
           return
         }
+        deudaGuardada = true
       }
 
-      onClienteCreado()
+      const mensaje = deudaGuardada
+        ? `Fiado de $${montoNum.toLocaleString('es-AR')} agregado a ${nombre.trim()}`
+        : dataDeudor.yaExistia
+          ? 'Ese cliente ya estaba registrado'
+          : 'Cliente agregado'
+      onClienteCreado(mensaje)
     } catch (err) {
       console.error(err)
       setError('Error de red')
@@ -70,7 +84,7 @@ export default function AgregarClienteManual({ slug, onClienteCreado, onCancelar
   }
 
   return (
-    <div className="agregar-cliente" role="group" aria-label="Agregar cliente a mano">
+    <div className="agregar-cliente" role="group" aria-label={esParaClienteExistente ? `Agregar fiado a ${clienteExistente!.nombre}` : 'Agregar cliente a mano'}>
       <div style={{ marginBottom: 10 }}>
         <label htmlFor="ac-nombre" className="agregar-cliente__label">Nombre</label>
         <input
@@ -80,7 +94,8 @@ export default function AgregarClienteManual({ slug, onClienteCreado, onCancelar
           onChange={(e) => setNombre(e.target.value)}
           placeholder="ej: Roberto Gómez"
           className="agregar-cliente__input"
-          autoFocus
+          disabled={esParaClienteExistente}
+          autoFocus={!esParaClienteExistente}
         />
       </div>
 
@@ -96,17 +111,11 @@ export default function AgregarClienteManual({ slug, onClienteCreado, onCancelar
         />
       </div>
 
-      {/* Bloque de deuda inicial */}
-      <div style={{
-        background: 'var(--color-rojo-soft)',
-        borderRadius: 8,
-        padding: '12px 14px',
-        marginBottom: 12,
-      }}>
+      <div style={{ background: 'var(--color-rojo-soft)', borderRadius: 8, padding: '12px 14px', marginBottom: 12 }}>
         <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--color-rojo)' }}>
-          ¿Anotar fiado ahora? (opcional)
+          {esParaClienteExistente ? 'Anotar fiado' : '¿Anotar fiado ahora? (opcional)'}
         </p>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
           <div style={{ flex: 1 }}>
             <label htmlFor="ac-monto" className="agregar-cliente__label">Monto</label>
             <input
@@ -117,6 +126,7 @@ export default function AgregarClienteManual({ slug, onClienteCreado, onCancelar
               placeholder="ej: 500"
               className="agregar-cliente__input"
               style={{ width: '100%' }}
+              autoFocus={esParaClienteExistente}
             />
           </div>
           <div style={{ flex: 2 }}>
@@ -138,7 +148,7 @@ export default function AgregarClienteManual({ slug, onClienteCreado, onCancelar
 
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={guardar} disabled={guardando} className="btn-primario" style={{ flex: 1, padding: '10px 16px', fontSize: 14 }}>
-          {guardando ? 'Guardando…' : monto ? 'Guardar cliente y deuda' : 'Guardar cliente'}
+          {guardando ? 'Guardando…' : esParaClienteExistente ? 'Guardar fiado' : monto ? 'Guardar cliente y deuda' : 'Guardar cliente'}
         </button>
         <button onClick={onCancelar} className="btn-secundario" style={{ padding: '10px 16px', fontSize: 14 }}>
           Cancelar

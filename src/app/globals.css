@@ -306,3 +306,26 @@ body {
   .app-shell__content { max-width: 900px; }
   .reportes__graficos { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 }
+
+.agregar-cliente__input:disabled {
+  background: var(--color-bg);
+  color: var(--color-ink-muted);
+  cursor: not-allowed;
+}
+
+.fila-deudor__agregar-fiado {
+  background: none; border: none; padding: 0; margin-top: 2px;
+  font-size: 11px; font-weight: 500; color: var(--color-accent); cursor: pointer;
+}
+.fila-deudor__editar {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  background: none; border: none; color: var(--color-ink-muted);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.fila-deudor__editar:active { background: var(--color-bg); }
+
+.boton-eliminar-cliente {
+  display: block; width: 100%; text-align: center; background: none; border: none;
+  color: var(--color-rojo); font-size: 13px; font-weight: 500; padding: 8px; cursor: pointer;
+}
+.boton-eliminar-cliente:active { opacity: 0.7; }
